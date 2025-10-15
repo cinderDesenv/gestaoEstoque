@@ -1,0 +1,14 @@
+{
+    "configurations": [
+        {
+            "type": "java",
+            "name": "Spring Boot-ControleItensApplication<controle-itens>",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "mainClass": "com.portaria.controle_itens.ControleItensApplication",
+            "projectName": "controle-itens",
+            "args": "",
+            "envFile": "${workspaceFolder}/.env"
+        }
+    ]
+}
