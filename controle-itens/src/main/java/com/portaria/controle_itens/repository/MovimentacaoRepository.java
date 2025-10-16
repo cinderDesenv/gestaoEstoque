@@ -11,12 +11,16 @@ import java.util.Optional;
 @Repository
 public interface MovimentacaoRepository extends JpaRepository<Movimentacao, Long> {
 
-    Optional<Movimentacao> findTopByItemIdAndDataDevolucaoIsNullOrderByDataRetiradaDesc(Long itemId);
+    Optional<Movimentacao> findTopByItem_IdAndDataDevolucaoIsNullOrderByDataRetiradaDesc(Long itemId);
     
     List<Movimentacao> findByDataDevolucaoIsNullAndTipoEqualsAndStatusPrazoEquals(String tipo, String statusPrazo);
 
-    List<Movimentacao> findByItemIdAndDataDevolucaoIsNullOrderByDataRetiradaAsc(Long itemId); 
+    List<Movimentacao> findByItem_IdAndDataDevolucaoIsNullOrderByDataRetiradaAsc(Long itemId); 
 
     @Transactional
-    void deleteByItemId(Long itemId);
+    void deleteByItem_Id(Long itemId);
+
+    List<Movimentacao> findByDataDevolucaoIsNullOrderByDataRetiradaAsc();
+
+    List<Movimentacao> findByItem_Id(Long itemId);
 }

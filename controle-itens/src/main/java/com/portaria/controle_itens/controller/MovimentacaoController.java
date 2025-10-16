@@ -48,12 +48,15 @@ public class MovimentacaoController {
 
         Item item = itemOpt.get();
         
-        Integer quantidadeRetirada = (Integer) requisicao.get("quantidade");
+        Integer quantidadeRetirada = null;
+        Object qObj = requisicao.get("quantidade");
+        if (qObj instanceof Number) quantidadeRetirada = ((Number) qObj).intValue();
+
         if (quantidadeRetirada == null || quantidadeRetirada <= 0) {
             return new ResponseEntity<>("A quantidade a ser retirada é obrigatória e deve ser > 0.", HttpStatus.BAD_REQUEST);
         }
 
-        Optional<Estoque> estoqueOpt = estoqueRepository.findByItemId(itemId);
+        Optional<Estoque> estoqueOpt = estoqueRepository.findByItem_Id(itemId);
         if (estoqueOpt.isEmpty()) {
              return new ResponseEntity<>("Dados de estoque não encontrados para este item.", HttpStatus.INTERNAL_SERVER_ERROR);
         }
@@ -72,10 +75,12 @@ public class MovimentacaoController {
         
         Movimentacao movimentacao = new Movimentacao();
         movimentacao.setItem(item);
+        movimentacao.setItemNome(item.getNome());
         movimentacao.setFuncionarioSolicitante(funcionario);
         movimentacao.setDataRetirada(LocalDateTime.now());
         movimentacao.setTipo(tipo); 
         movimentacao.setQuantidade(quantidadeRetirada);
+        movimentacao.setDataRegistro(LocalDateTime.now());
 
         if ("RETIRADA".equalsIgnoreCase(tipo)) {
             String dataStr = (String) requisicao.get("dataPrevistaDevolucao");
@@ -107,7 +112,8 @@ public class MovimentacaoController {
                                  "Indeterminado";
 
         auditoriaService.registrarLog("RETIRADA_" + tipo.toUpperCase(), itemId, 
-            String.format("Retirada de %d unidades por %s. Prazo: %s", quantidadeRetirada, funcionario, dataPrevistaStr));
+            String.format("Retirada de %d unidades do item [%s | id=%d]. Solicitante: %s. Prazo: %s", 
+                          quantidadeRetirada, item.getNome(), item.getId(), funcionario, dataPrevistaStr));
 
 
         return new ResponseEntity<>(movimentacao, HttpStatus.CREATED);
@@ -123,7 +129,7 @@ public class MovimentacaoController {
         }
 
         Optional<Item> itemOpt = itemRepository.findById(itemId);
-        Optional<Estoque> estoqueOpt = estoqueRepository.findByItemId(itemId);
+        Optional<Estoque> estoqueOpt = estoqueRepository.findByItem_Id(itemId);
         
         if (itemOpt.isEmpty() || estoqueOpt.isEmpty()) {
             return new ResponseEntity<>("Item ou Estoque não encontrado.", HttpStatus.NOT_FOUND);
@@ -136,12 +142,10 @@ public class MovimentacaoController {
              return new ResponseEntity<>("Erro: A quantidade devolvida excede as unidades atualmente fora de estoque (" + unidadesFora + ").", HttpStatus.BAD_REQUEST);
         }
         
-        // 1. Aumentar o estoque
         estoque.setQuantidadeDisponivel(estoque.getQuantidadeDisponivel() + quantidadeDevolvida);
         estoqueRepository.save(estoque);
 
-        // 2. Fechar as Movimentações ativas (FIFO)
-        List<Movimentacao> movimentacoesAtivas = movimentacaoRepository.findByItemIdAndDataDevolucaoIsNullOrderByDataRetiradaAsc(itemId);
+        List<Movimentacao> movimentacoesAtivas = movimentacaoRepository.findByItem_IdAndDataDevolucaoIsNullOrderByDataRetiradaAsc(itemId);
         int restanteParaFechar = quantidadeDevolvida;
         
         LocalDateTime agora = LocalDateTime.now();
@@ -153,7 +157,6 @@ public class MovimentacaoController {
             int quantidadeAtiva = mov.getQuantidade();
             
             if (restanteParaFechar >= quantidadeAtiva) {
-                // Fecha completamente
                 mov.setDataDevolucao(agora);
                 mov.setStatusPrazo(determinarStatusFinal(mov)); 
                 movimentacaoRepository.save(mov);
@@ -161,9 +164,7 @@ public class MovimentacaoController {
                 quantidadeEfetivamenteFechada += quantidadeAtiva;
                 
             } else {
-                // Devolução Parcial: Reduz a quantidade do registro mais antigo
                 int quantidadeRemanescente = quantidadeAtiva - restanteParaFechar;
-                
                 mov.setQuantidade(quantidadeRemanescente);
                 movimentacaoRepository.save(mov);
                 quantidadeEfetivamenteFechada += restanteParaFechar; 
@@ -171,18 +172,16 @@ public class MovimentacaoController {
             }
         }
         
-        // REGISTRO DE AUDITORIA: DEVOLUÇÃO
         auditoriaService.registrarLog("DEVOLUCAO_ITEM", itemId, 
-            String.format("Devolução de %d unidades. Total fechado no histórico: %d.", quantidadeDevolvida, quantidadeEfetivamenteFechada));
+            String.format("Devolução de %d unidades do item id=%d. Total fechado no histórico: %d.", quantidadeDevolvida, itemId, quantidadeEfetivamenteFechada));
         
         return new ResponseEntity<>("Devolução registrada com sucesso. Estoque atualizado.", HttpStatus.OK);
     }
 
     private String determinarStatusFinal(Movimentacao mov) {
-        if ("RETIRADA".equalsIgnoreCase(mov.getTipo())) {
+        if ("RETIRADA".equalsIgnoreCase(mov.getTipo()) && mov.getDataDevolucao() != null) {
             LocalDate dataLimite = mov.getDataPrevistaDevolucao();
             LocalDate dataDevolucao = mov.getDataDevolucao().toLocalDate();
-            
             if (dataLimite != null && dataDevolucao.isAfter(dataLimite)) {
                 return "ATRASADO";
             }
@@ -190,26 +189,33 @@ public class MovimentacaoController {
         return "CONCLUIDO";
     }
 
+    @GetMapping("/ativas")
+    public ResponseEntity<List<Movimentacao>> getAllMovimentacoesAtivas() {
+        List<Movimentacao> movimentacoes = movimentacaoRepository.findByDataDevolucaoIsNullOrderByDataRetiradaAsc();
+        return ResponseEntity.ok(movimentacoes);
+    }
+
+    @GetMapping("/movimentacoes")
+    public ResponseEntity<List<Movimentacao>> getMovimentacoesAllFallback() {
+        List<Movimentacao> todos = movimentacaoRepository.findAll();
+        return ResponseEntity.ok(todos);
+    }
+    
     @GetMapping("/ativa/{itemId}")
     public ResponseEntity<Movimentacao> getMovimentacaoAtiva(@PathVariable Long itemId) {
-        // Busca a movimentação mais recente que ainda está ATIVA
-        Optional<Movimentacao> movimentacaoOpt = movimentacaoRepository.findTopByItemIdAndDataDevolucaoIsNullOrderByDataRetiradaDesc(itemId);
-        
-        return movimentacaoOpt.map(ResponseEntity::ok)
-                   .orElseGet(() -> ResponseEntity.notFound().build());
+        Optional<Movimentacao> movimentacaoOpt = movimentacaoRepository.findTopByItem_IdAndDataDevolucaoIsNullOrderByDataRetiradaDesc(itemId);
+        return movimentacaoOpt.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
     }
     
     @GetMapping("/ativas/{itemId}")
     public ResponseEntity<List<Movimentacao>> getMovimentacoesAtivas(@PathVariable Long itemId) {
-        List<Movimentacao> movimentacoes = movimentacaoRepository.findByItemIdAndDataDevolucaoIsNullOrderByDataRetiradaAsc(itemId);
+        List<Movimentacao> movimentacoes = movimentacaoRepository.findByItem_IdAndDataDevolucaoIsNullOrderByDataRetiradaAsc(itemId);
         return ResponseEntity.ok(movimentacoes); 
     }
     
     @GetMapping("/estoque/{itemId}")
     public ResponseEntity<Estoque> getEstoquePorItem(@PathVariable Long itemId) {
-        Optional<Estoque> estoqueOpt = estoqueRepository.findByItemId(itemId);
-        
-        return estoqueOpt.map(ResponseEntity::ok)
-                   .orElseGet(() -> ResponseEntity.notFound().build());
+        Optional<Estoque> estoqueOpt = estoqueRepository.findByItem_Id(itemId);
+        return estoqueOpt.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
     }
 }

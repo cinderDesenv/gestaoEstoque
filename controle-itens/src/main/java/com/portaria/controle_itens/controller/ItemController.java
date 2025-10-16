@@ -2,6 +2,7 @@ package com.portaria.controle_itens.controller;
 
 import com.portaria.controle_itens.model.Estoque;
 import com.portaria.controle_itens.model.Item;
+import com.portaria.controle_itens.model.Movimentacao;
 import com.portaria.controle_itens.repository.EstoqueRepository;
 import com.portaria.controle_itens.repository.ItemRepository;
 import com.portaria.controle_itens.repository.MovimentacaoRepository;
@@ -35,10 +36,11 @@ public class ItemController {
 
     @PostMapping
     public ResponseEntity<?> criarItemEmVolume(@RequestBody Map<String, Object> requisicao) {
-        
         String nome = (String) requisicao.get("nome");
-        Integer quantidadeTotal = (Integer) requisicao.get("quantidadeTotal");
-        
+        Integer quantidadeTotal = null;
+        Object qObj = requisicao.get("quantidadeTotal");
+        if (qObj instanceof Number) quantidadeTotal = ((Number) qObj).intValue();
+
         if (nome == null || quantidadeTotal == null || quantidadeTotal <= 0) {
             return new ResponseEntity<>("Nome e Quantidade Total (> 0) são obrigatórios.", HttpStatus.BAD_REQUEST);
         }
@@ -55,7 +57,7 @@ public class ItemController {
         novoEstoque.setQuantidadeDisponivel(quantidadeTotal);
         estoqueRepository.save(novoEstoque);
 
-        auditoriaService.registrarLog("CRIACAO_ITEM", itemSalvo.getId(), "Novo item: " + nome + " (Qtd: " + quantidadeTotal + ")");
+        auditoriaService.registrarLog("CRIACAO_ITEM", itemSalvo.getId(), "Novo item criado: " + nome);
 
         return new ResponseEntity<>(itemSalvo, HttpStatus.CREATED);
     }
@@ -68,9 +70,7 @@ public class ItemController {
     @GetMapping("/{id}")
     public ResponseEntity<Item> buscarPorId(@PathVariable Long id) {
         Optional<Item> item = itemRepository.findById(id);
-        
-        return item.map(ResponseEntity::ok)
-                   .orElseGet(() -> ResponseEntity.notFound().build());
+        return item.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @PutMapping("/{id}")
@@ -80,35 +80,45 @@ public class ItemController {
                 item.setNome(itemDetalhes.getNome());
                 item.setPatrimonio(itemDetalhes.getPatrimonio());
                 item.setDescricao(itemDetalhes.getDescricao());
-
                 Item atualizado = itemRepository.save(item);
+                auditoriaService.registrarLog("ATUALIZACAO_ITEM", item.getId(), "Item atualizado: " + item.getNome());
                 return ResponseEntity.ok(atualizado);
             }).orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @DeleteMapping("/{id}")
     @Transactional
-    public ResponseEntity<Void> deletarItem(@PathVariable Long id) {
+    public ResponseEntity<?> deletarItem(@PathVariable Long id) {
         Optional<Item> itemOpt = itemRepository.findById(id);
         if (itemOpt.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
-        
-        String nomeItem = itemOpt.get().getNome();
 
-        movimentacaoRepository.deleteByItemId(id);
-        Optional<Estoque> estoque = estoqueRepository.findByItemId(id);
+        Item item = itemOpt.get();
+        String nomeItem = item.getNome();
+
+        List<Movimentacao> movs = movimentacaoRepository.findByItem_Id(id);
+        for (Movimentacao mov : movs) {
+            if (mov.getItemNome() == null || mov.getItemNome().isBlank()) {
+                mov.setItemNome(nomeItem);
+            }
+            mov.setItem(null);
+            movimentacaoRepository.save(mov);
+        }
+
+        Optional<Estoque> estoque = estoqueRepository.findByItem_Id(id);
         estoque.ifPresent(e -> estoqueRepository.delete(e));
+
         itemRepository.deleteById(id);
-        
-        auditoriaService.registrarLog("EXCLUSAO_ITEM", id, "Item excluído: " + nomeItem + " (Exclusão total, incluindo histórico).");
+
+        auditoriaService.registrarLog("EXCLUSAO_ITEM", id, "Item excluído: " + nomeItem);
 
         return ResponseEntity.noContent().build();
     }
 
     @PatchMapping("/estoque/{itemId}")
     public ResponseEntity<?> atualizarEstoqueTotal(@PathVariable Long itemId, @RequestBody Map<String, Integer> requisicao) {
-        Optional<Estoque> estoqueOpt = estoqueRepository.findByItemId(itemId);
+        Optional<Estoque> estoqueOpt = estoqueRepository.findByItem_Id(itemId);
 
         if (estoqueOpt.isEmpty()) {
             return new ResponseEntity<>("Estoque não encontrado para este item.", HttpStatus.NOT_FOUND);
@@ -119,20 +129,13 @@ public class ItemController {
             return new ResponseEntity<>("Nova quantidade total inválida.", HttpStatus.BAD_REQUEST);
         }
 
-        Estoque estoque = estoqueOpt.get(); 
-        
+        Estoque estoque = estoqueOpt.get();
         int diferenca = novaQuantidade - estoque.getQuantidadeTotal();
-        
         estoque.setQuantidadeTotal(novaQuantidade);
-        estoque.setQuantidadeDisponivel(estoque.getQuantidadeDisponivel() + diferenca);
-
-        if (estoque.getQuantidadeDisponivel() < 0) {
-            estoque.setQuantidadeDisponivel(0);
-        }
-
+        estoque.setQuantidadeDisponivel(Math.max(0, estoque.getQuantidadeDisponivel() + diferenca));
         estoqueRepository.save(estoque);
 
-        String detalhes = String.format("Ajuste de QTD: De %d para %d (Diferença: %+d)", 
+        String detalhes = String.format("Ajuste de QTD: De %d para %d (Diferença: %+d)",
                                         estoque.getQuantidadeTotal() - diferenca, novaQuantidade, diferenca);
         auditoriaService.registrarLog("AJUSTE_ESTOQUE", itemId, detalhes);
 

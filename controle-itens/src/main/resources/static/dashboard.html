@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>SAGO | Painel</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="dashboard-body">
+  <header class="header">
+    <div class="header-left">
+      <img src="logo-sago-semfundo.png" alt="Logo SAGO" class="logo-dashboard" />
+      <div>
+        <div class="app-title">SAGO</div>
+        <div class="app-sub">Controle de Patrimônio e Empréstimos</div>
+      </div>
+    </div>
+
+    <nav class="header-right" aria-label="Navegação principal">
+      <div class="nav-group">
+        <button class="nav-btn active" data-section="itens">Itens</button>
+        <button class="nav-btn" data-section="movimentacoes">Movimentações</button>
+        <button class="nav-btn admin-only" data-section="auditoria">Auditoria</button>
+      </div>
+      <button id="logoutBtn" class="btn danger logout-btn">Sair</button>
+    </nav>
+  </header>
+
+  <main class="container">
+    <section id="itens" class="section active" aria-labelledby="itensTitle">
+      <div class="section-header">
+        <h2 id="itensTitle">Controle de Itens</h2>
+        <div class="search-area">
+          <input id="searchItem" type="search" placeholder="Buscar item por nome..." aria-label="Buscar item por nome" class="input-search" />
+          <button id="novoItemBtn" class="btn secondary">Novo Item</button>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table class="table" aria-describedby="itensTitle">
+          <thead>
+            <tr>
+              <th>Nome</th>
+              <th>Patrimônio</th>
+              <th>Descrição</th>
+              <th>Disponível</th>
+              <th>Total</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody id="itemList"></tbody>
+        </table>
+        <div id="itensEmpty" class="empty-state">Carregando itens...</div>
+      </div>
+    </section>
+
+    <section id="movimentacoes" class="section" aria-labelledby="movTitle">
+      <div class="section-header">
+        <h2 id="movTitle">Movimentações</h2>
+      </div>
+
+      <div class="table-wrap">
+        <h3 class="subsection-title">Ativas</h3>
+        <table class="table" aria-describedby="movTitle">
+          <thead>
+            <tr>
+              <th>Item</th>
+              <th>Solicitante</th>
+              <th>Tipo</th>
+              <th>Quantidade</th>
+              <th>Previsto Devolução</th>
+              <th>Data Registro</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody id="movList"></tbody>
+        </table>
+        <div id="movEmpty" class="empty-state">Carregando movimentações ativas...</div>
+
+        <hr />
+    </section>
+
+    <section id="auditoria" class="section admin-only" aria-labelledby="auditTitle">
+      <div class="section-header">
+        <div>
+          <h2 id="auditTitle">Auditoria</h2>
+          <div class="field-muted">Registros de ações e histórico</div>
+        </div>
+        <div class="search-area search-audit-area">
+          <input id="searchAudit" type="search" placeholder="Buscar por usuário, ação, item ou detalhes..." aria-label="Buscar auditoria" class="input-search" />
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table class="table" aria-describedby="auditTitle">
+          <thead>
+            <tr>
+              <th>Usuário</th>
+              <th>Ação</th>
+              <th>Item</th>
+              <th>Detalhes</th>
+              <th>Data</th>
+            </tr>
+          </thead>
+          <tbody id="auditList"></tbody>
+        </table>
+        <div id="auditEmpty" class="empty-state">Carregando auditoria...</div>
+      </div>
+    </section>
+  </main>
+
+  <template id="item-row-template">
+    <tr class="item-row">
+      <td class="cell-name"></td>
+      <td class="cell-patrimonio"></td>
+      <td class="cell-desc"></td>
+      <td class="cell-available"></td>
+      <td class="cell-total"></td>
+      <td class="cell-actions"></td>
+    </tr>
+  </template>
+
+  <!-- Retirada Modal -->
+  <div id="retiradaModal" class="modal" aria-hidden="true" role="dialog" aria-labelledby="retiradaTitle">
+    <div class="modal-panel">
+      <h3 id="retiradaTitle">Registrar Retirada</h3>
+      <form id="retiradaForm" class="modal-form" novalidate>
+        <div class="form-row">
+          <label>Item</label>
+          <div id="retItemName" class="field-muted"></div>
+        </div>
+        <div class="form-row">
+          <label for="retQuantidade">Quantidade</label>
+          <input id="retQuantidade" type="number" min="1" required />
+        </div>
+        <div class="form-row">
+          <label for="retFuncionario">Funcionário solicitante</label>
+          <input id="retFuncionario" type="text" required />
+        </div>
+        <div class="form-row">
+          <label for="retTipo">Tipo</label>
+          <select id="retTipo" class="select-typed">
+            <option value="RETIRADA">RETIRADA</option>
+            <option value="CEDIDO">CEDIDO</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label for="retDataPrev">Data prevista de devolução</label>
+          <input id="retDataPrev" type="date" />
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn secondary" data-action="close">Cancelar</button>
+          <button type="submit" class="btn primary">Registrar</button>
+        </div>
+        <p id="retError" class="error-message"></p>
+      </form>
+    </div>
+  </div>
+
+  <!-- Devolução Modal -->
+  <div id="devolucaoModal" class="modal" aria-hidden="true" role="dialog" aria-labelledby="devolucaoTitle">
+    <div class="modal-panel">
+      <h3 id="devolucaoTitle">Registrar Devolução</h3>
+      <form id="devolucaoForm" class="modal-form" novalidate>
+        <div class="form-row">
+          <label>Item</label>
+          <div id="devItemName" class="field-muted"></div>
+        </div>
+        <div class="form-row">
+          <label for="devQuantidade">Quantidade devolvida</label>
+          <input id="devQuantidade" type="number" min="1" required />
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn secondary" data-action="close">Cancelar</button>
+          <button type="submit" class="btn primary">Registrar</button>
+        </div>
+        <p id="devError" class="error-message"></p>
+      </form>
+    </div>
+  </div>
+
+  <!-- Novo Item Modal -->
+  <div id="novoItemModal" class="modal" aria-hidden="true" role="dialog" aria-labelledby="novoItemTitle">
+    <div class="modal-panel">
+      <h3 id="novoItemTitle">Novo Item</h3>
+      <form id="novoItemForm" class="modal-form" novalidate>
+        <div class="form-row">
+          <label for="novoNome">Nome</label>
+          <input id="novoNome" type="text" required />
+        </div>
+        <div class="form-row">
+          <label for="novoPatrimonio">Patrimônio</label>
+          <input id="novoPatrimonio" type="text" />
+        </div>
+        <div class="form-row">
+          <label for="novoDescricao">Descrição</label>
+          <input id="novoDescricao" type="text" />
+        </div>
+        <div class="form-row">
+          <label for="novoQuantidadeTotal">Quantidade Total</label>
+          <input id="novoQuantidadeTotal" type="number" min="1" required />
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn secondary" data-action="close">Cancelar</button>
+          <button type="submit" class="btn primary">Criar</button>
+        </div>
+        <p id="novoItemError" class="error-message"></p>
+      </form>
+    </div>
+  </div>
+
+  <!-- Delete confirm -->
+  <div id="deleteConfirmModal" class="modal" aria-hidden="true" role="dialog" aria-labelledby="deleteConfirmTitle">
+    <div class="modal-panel">
+      <h3 id="deleteConfirmTitle">Confirmar exclusão</h3>
+      <p id="deleteConfirmText" class="field-muted"></p>
+      <div class="modal-actions">
+        <button type="button" class="btn secondary" data-action="close">Cancelar</button>
+        <button id="confirmDeleteBtn" type="button" class="btn danger">Excluir</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toastContainer" class="toast-container" aria-live="polite"></div>
+
+  <script src="script.js" defer></script>
+</body>
+</html>

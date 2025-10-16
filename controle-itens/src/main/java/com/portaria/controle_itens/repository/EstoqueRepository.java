@@ -8,6 +8,5 @@ import java.util.Optional;
 
 @Repository
 public interface EstoqueRepository extends JpaRepository<Estoque, Long> {
-    
-    Optional<Estoque> findByItemId(Long itemId);
+    Optional<Estoque> findByItem_Id(Long itemId);
 }
