@@ -405,7 +405,7 @@ function abrirDevolucaoModal(itemId, nome) {
 
 function openDeleteConfirm(id, nome) {
   deleteTargetId = id;
-  qs('#deleteConfirmText').textContent = `Deseja excluir o item "${nome}"? Esta ação removerá o item e o estoque, mas preservará o histórico e auditoria.`;
+  qs('#deleteConfirmText').textContent = `Deseja excluir o item "${nome}"? Esta ação removerá o item e o estoque`;
   openModal(qs('#deleteConfirmModal'));
 }
 

@@ -23,7 +23,6 @@
   --page-ease: cubic-bezier(.2,.9,.2,1);
 }
 
-/* Reset and base */
 *{box-sizing:border-box}
 html,body{height:100%}
 body{
@@ -136,10 +135,8 @@ body{
   color: #004646;
 } 
 
-/* Muted text */
 .field-muted{color:var(--muted-slate);font-size:0.9rem}
 
-/* Empty state */
 .empty-state{padding:1rem;text-align:center;color:var(--muted-slate)}
 
 /* Overdue badge */
@@ -148,13 +145,12 @@ tr.overdue td:first-child::after{
   content:"ATRASADO";display:inline-block;background:#ff6b6b;color:#fff;font-size:0.65rem;padding:4px 8px;border-radius:6px;margin-left:8px;
 }
 
-/* Tooltip for truncated descriptions */
 td .tooltip{position:relative}
 td .tooltip:hover::after{
   content:attr(data-full);position:absolute;left:0;top:100%;white-space:normal;background:var(--bg-1);color:var(--text);padding:8px;border-radius:8px;box-shadow:var(--shadow-1);z-index:40;width:320px;margin-top:8px;font-size:0.9rem;
 }
 
-/* Login area styled for Azul Petróleo theme */
+/* Login */
 .login-body {
   min-height: 100vh;
   display: flex;
@@ -199,7 +195,6 @@ td .tooltip:hover::after{
   margin-bottom: 0.75rem;
 }
 
-/* Form controls */
 .login-container .form input[type="text"],
 .login-container .form input[type="password"] {
   width: 100%;
@@ -218,7 +213,7 @@ td .tooltip:hover::after{
   border-color: var(--soft-cyan);
 }
 
-/* Buttons on login */
+/* Botões de login */
 .login-container .form .btn {
   width: 100%;
   padding: 0.75rem;
@@ -235,7 +230,7 @@ td .tooltip:hover::after{
   transform: translateY(-2px);
 }
 
-/* Error */
+/* Erro */
 .login-container .error-message {
   color: var(--danger);
   font-size: 0.9rem;
@@ -243,7 +238,7 @@ td .tooltip:hover::after{
   min-height: 1.1rem;
 }
 
-/* Small screens */
+/* telas pequenas */
 @media (max-width:900px){
   .container{padding:0 0.6rem}
   .table thead{display:none}
@@ -253,10 +248,8 @@ td .tooltip:hover::after{
   .modal-panel{width:92%}
 }
 
-/* Accessibility focus */
 :focus{outline:2px solid rgba(51,184,210,0.18);outline-offset:2px}
 
-/* Page transition helpers */
 .body-animating, .login-animating { pointer-events: none; }
 
 .login-container.page-exit {
